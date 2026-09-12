@@ -1,59 +1,238 @@
-// Ақтау қаласы бойынша 2GIS және Google Maps негізіндегі нақты эко-нүктелер
+<!DOCTYPE html>
+<html lang="kk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Қазақстанның Интерактивті Эко-Картасы</title>
+  
+  <!-- Leaflet CSS (Карта стилі) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      background-color: #f4f6f8;
+    }
+    header {
+      background-color: #2e7d32;
+      color: white;
+      padding: 15px;
+      text-align: center;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+    header h1 {
+      margin: 0;
+      font-size: 22px;
+    }
+    header p {
+      margin: 5px 0 0 0;
+      font-size: 13px;
+      opacity: 0.9;
+    }
+    .controls {
+      background: white;
+      padding: 12px;
+      text-align: center;
+      border-bottom: 1px solid #ddd;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    select {
+      padding: 8px 14px;
+      font-size: 14px;
+      border-radius: 6px;
+      border: 1px solid #2e7d32;
+      outline: none;
+      background-color: white;
+      cursor: pointer;
+      font-weight: bold;
+      color: #2e7d32;
+      max-width: 100%;
+    }
+    #map {
+      flex: 1;
+      width: 100%;
+      min-height: 350px;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>🌱 Қазақстанның Жалпы Эко-Картасы</h1>
+    <p>Облыс орталықтарындағы қайта өңдеу және вторсырье қабылдау пункттері</p>
+  </header>
+
+  <div class="controls">
+    <label for="citySelect"><b>Өңірді / Қаланы таңдаңыз: </b></label>
+    <select id="citySelect" onchange="changeCity()">
+      <option value="aktau">Манғыстау облысы (Ақтау)</option>
+      <option value="astana">Астана қаласы</option>
+      <option value="almaty">Алматы қаласы</option>
+      <option value="shymkent">Шымкент қаласы</option>
+      <option value="karaganda">Қарағанды облысы (Қарағанды)</option>
+      <option value="aktobe">Ақтөбе облысы (Ақтөбе)</option>
+      <option value="atyrau">Атырау облысы (Атырау)</option>
+      <option value="oral">Батыс Қазақстан (Орал)</option>
+      <option value="pavlodar">Павлодар облысы (Павлодар)</option>
+      <option value="oskemen">Шығыс Қазақстан (Өскемен)</option>
+      <option value="semey">Абай облысы (Семей)</option>
+      <option value="taraz">Жамбыл облысы (Тараз)</option>
+      <option value="kyzylorda">Қызылорда облысы (Қызылорда)</option>
+      <option value="petropavl">Солтүстік Қазақстан (Петропавл)</option>
+      <option value="kokshetau">Ақмола облысы (Көкшетау)</option>
+      <option value="kostanay">Қостанай облысы (Қостанай)</option>
+      <option value="turkistan">Түркістан облысы (Түркістан)</option>
+      <option value="taldykorgan">Жетісу облысы (Талдықорған)</option>
+    </select>
+  </div>
+
+  <div id="map"></div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  
+  <script>
+    // 1. Барлық облыс орталықтарының координаталары
+    const cities = {
+      aktau: { coords: [43.6481, 51.1722], zoom: 12 },
+      astana: { coords: [51.1693, 71.4491], zoom: 12 },
+      almaty: { coords: [43.2389, 76.8897], zoom: 12 },
+      shymkent: { coords: [42.3155, 69.5869], zoom: 12 },
+      karaganda: { coords: [49.8019, 73.1021], zoom: 12 },
+      aktobe: { coords: [50.2839, 57.1670], zoom: 12 },
+      atyrau: { coords: [47.0945, 51.9238], zoom: 12 },
+      oral: { coords: [51.2278, 51.3861], zoom: 12 },
+      pavlodar: { coords: [52.2873, 76.9671], zoom: 12 },
+      oskemen: { coords: [49.9529, 82.6102], zoom: 12 },
+      semey: { coords: [50.4111, 80.2275], zoom: 12 },
+      taraz: { coords: [42.9000, 71.3667], zoom: 12 },
+      kyzylorda: { coords: [44.8488, 65.4999], zoom: 12 },
+      petropavl: { coords: [54.8667, 69.1500], zoom: 12 },
+      kokshetau: { coords: [53.2833, 69.3833], zoom: 12 },
+      kostanay: { coords: [53.2144, 63.6246], zoom: 12 },
+      turkistan: { coords: [43.2973, 68.2517], zoom: 12 },
+      taldykorgan: { coords: [45.0156, 78.3764], zoom: 12 }
+    };
+
+    // 2. 2GIS және Google Maps бойынша нақты эко-нүктелер базасы
     const ecoPoints = [
-      // 1. Eco Waste Aqtau - Негізгі қабылдау орталықтары
-      {
-        city: "aktau",
-        title: "Eco Waste Aqtau (Бас қабылдау орталығы)",
-        category: "Пластик, Кағаз, Картон, Пленка, Тұрмыстық қалдықтар",
-        address: "3Б шағынауданы, 39/3",
-        coords: [43.6705, 51.1895]
-      },
-      {
-        city: "aktau",
-        title: "Eco Waste Aqtau (25 мкр пункт)",
-        category: "Пластик, Макулатура, ПЭТ бөлтелкелер, Картон",
-        address: "25-ші шағынаудан, 20/2",
-        coords: [43.6591, 51.1712]
-      },
-      {
-        city: "aktau",
-        title: "Eco Waste Aqtau (21 мкр пункт)",
-        category: "Пластик, Батареялар, Вторсырье, Кағаз",
-        address: "21-ші шағынаудан, 1/31а",
-        coords: [43.6552, 51.1620]
-      },
+      // Ақтау
+      { city: "aktau", title: "Eco Waste Aqtau (Бас орталық)", category: "Пластик, Кағаз, Картон, Пленка", address: "3Б шағынауданы, 39/3", coords: [43.6705, 51.1895] },
+      { city: "aktau", title: "Eco Waste Aqtau (25 мкр)", category: "Пластик, Макулатура, ПЭТ", address: "25-ші шағынаудан, 20/2", coords: [43.6591, 51.1712] },
+      { city: "aktau", title: "Eco Waste Aqtau (21 мкр)", category: "Пластик, Батареялар, Кағаз", address: "21-ші шағынаудан, 1/31а", coords: [43.6552, 51.1620] },
+      { city: "aktau", title: "KAZ Waste Recycling", category: "Макулатура, Картон, Алюминий", address: "Промзона 1, 51-ші ғимарат", coords: [43.6680, 51.2150] },
+      { city: "aktau", title: "ВторСырье Ақтау", category: "Пластик, ПЭТ, Шыны ыдыстар", address: "22-ші шағынаудан, 12", coords: [43.6495, 51.1688] },
+      { city: "aktau", title: "Эко-Бокс (Батарейкалар)", category: "Батарейкалар, Лампалар", address: "14-ші шағынаудан, 61", coords: [43.6421, 51.1553] },
 
-      // 2. Қала ішіндегі қосымша қабылдау және сұрыптау нүктелері
-      {
-        city: "aktau",
-        title: "KAZ Waste Recycling (Пункт приема)",
-        category: "Макулатура, Картон, Селофан, Алюминий банкілер",
-        address: "Промзона 1, 51-ші ғимарат",
-        coords: [43.6680, 51.2150]
-      },
-      {
-        city: "aktau",
-        title: "ВторСырье Ақтау (Приемный пункт)",
-        category: "Пластик, ПЭТ, Шыны ыдыстар, Картон",
-        address: "22-ші шағынаудан, 12 бөлме/ғимарат",
-        coords: [43.6495, 51.1688]
-      },
-      {
-        city: "aktau",
-        title: "Эко-Бокс (Батарейкалар мен лампалар)",
-        category: "Пайдаланылған батарейкалар, Люминесцентті лампалар",
-        address: "14-ші шағынаудан, 61 (ТК Астана маңы)",
-        coords: [43.6421, 51.1553]
-      },
-      {
-        city: "aktau",
-        title: "Промзона Эко Тазалық (Қалдықтарды утилизациялау)",
-        category: "Өндірістік қалдықтар, Электроника, Пластик",
-        address: "Промзона 2, 18-ші участок",
-        coords: [43.6820, 51.2310]
-      },
+      // Астана
+      { city: "astana", title: "Clean City NC (Вторсырье)", category: "Пластик, Макулатура, Стекло", address: "Сарыарқа проспектісі, 31/1а", coords: [51.1685, 71.4120] },
+      { city: "astana", title: "LS Astana Вторресурс", category: "Картон, ПЭТ Бөтелкелер", address: "Е-67 көшесі, 8", coords: [51.1200, 71.4100] },
+      { city: "astana", title: "Астана Эко-Пункт", category: "Батареялар, Пластик", address: "Бөгенбай батыр даңғылы, 56", coords: [51.1810, 71.4250] },
 
-      // Астана, Алматы және басқа қалалардың нүктелері төменде жалғаса береді...
-      { city: "astana", title: "LS Astana (Пункт сбора)", category: "Пластик, Макулатура", address: "Сарыарқа проспектісі, 31/1а", coords: [51.1685, 71.4120] },
-      { city: "almaty", title: "Ecosen / Алатауэковтор", category: "Макулатура, Электроника", address: "Байзақов көшесі, 73/1", coords: [43.2510, 76.9150] }
+      // Алматы
+      { city: "almaty", title: "Ecosen Хаб", category: "Макулатура, Электроника, Пластик", address: "Байзақов көшесі, 73/1", coords: [43.2510, 76.9150] },
+      { city: "almaty", title: "Алатауэковтор", category: "Пластик, Шыны, Алюминий банкілер", address: "Сабатаев көшесі, 18", coords: [43.3200, 76.9200] },
+      { city: "almaty", title: "Taza Qala Тастақ", category: "Қағаз, Картон, ПЭТ", address: "Толе би көшесі, 201", coords: [43.2520, 76.8820] },
+
+      // Шымкент
+      { city: "shymkent", title: "АСПИК Вторсырье", category: "Макулатура, Пластик", address: "Қойкелді батыр көшесі, 95/2", coords: [42.3120, 69.6010] },
+      { city: "shymkent", title: "Шымкент Эко-Ресурс", category: "Картон, Пленка", address: "Жиделібай батыр көшесі, 12", coords: [42.3300, 69.5800] },
+
+      // Қарағанды
+      { city: "karaganda", title: "EcoTeam Караганда", category: "Пластик, Кағаз, Металл", address: "Складская көшесі, 5", coords: [49.8150, 73.0900] },
+      { city: "karaganda", title: "Вторичное сырье Майкудук", category: "Макулатура, ПЭТ", address: "Пригородная көшесі, 2", coords: [49.7900, 73.1100] },
+
+      // Ақтөбе
+      { city: "aktobe", title: "Ақтөбе Вторсырье", category: "Пластик, Макулатура", address: "Санкибай батыр даңғылы, 24", coords: [50.2900, 57.1500] },
+      { city: "aktobe", title: "Эко Сервис Ақтөбе", category: "Картон, Шыны", address: "Жанқожа батыр көшесі, 88", coords: [50.2750, 57.1850] },
+
+      // Атырау
+      { city: "atyrau", title: "Атырау Эко-Бокс", category: "Пластик, Батареялар", address: "Сәтпаев көшесі, 18", coords: [47.1000, 51.9100] },
+      { city: "atyrau", title: "Каспий Вторресурс", category: "Макулатура, ПЭТ", address: "Азаттық даңғылы, 101", coords: [47.1120, 51.9280] },
+
+      // Орал
+      { city: "oral", title: "Орал Вторпереработка", category: "Макулатура, Картон, Пластик", address: "Шолохов көшесі, 11", coords: [51.2400, 51.3900] },
+
+      // Павлодар
+      { city: "pavlodar", title: "Павлодар Эко-Пункт", category: "Пластик, Макулатура", address: "Камзин көшесі, 67", coords: [52.2800, 76.9800] },
+
+      // Өскемен
+      { city: "oskemen", title: "Шығыс Вторресурс", category: "Қағаз, Картон, Пластик", address: "Абай даңғылы, 102", coords: [49.9600, 82.6000] },
+
+      // Семей
+      { city: "semey", title: "Семей Вторсырье", category: "Макулатура, Картон", address: "Кабылбаев көшесі, 31", coords: [50.4150, 80.2400] },
+
+      // Тараз
+      { city: "taraz", title: "Тараз Таза Қала", category: "Пластик, Бөтелкелер", address: "Жамбыл даңғылы, 140", coords: [42.8950, 71.3750] },
+
+      // Қызылорда
+      { city: "kyzylorda", title: "Қызылорда ВторСоб", category: "Макулатура, Пластик", address: "Сұлтанов көшесі, 5", coords: [44.8500, 65.5100] },
+
+      // Петропавл
+      { city: "petropavl", title: "СКО Вторресурс", category: "Картон, ПЭТ, Макулатура", address: "Ярослав Гашек көшесі, 9", coords: [54.8750, 69.1350] },
+
+      // Көкшетау
+      { city: "kokshetau", title: "Көкше Вторсырье", category: "Макулатура, Пластик", address: "Уәлиханов көшесі, 180", coords: [53.2900, 69.3900] },
+
+      // Қостанай
+      { city: "kostanay", title: "Қостанай Эко-Сбор", category: "Пластик, Картон, Шыны", address: "Складская көшесі, 10", coords: [53.2200, 63.6300] },
+
+      // Түркістан
+      { city: "turkistan", title: "Түркістан ВторРесурс", category: "Пластик, Макулатура", address: "Тауке хан даңғылы, 50", coords: [43.3000, 68.2600] },
+
+      // Талдықорған
+      { city: "taldykorgan", title: "Жетісу Эко-Пункт", category: "Макулатура, ПЭТ", address: "Жансүгіров көшесі, 92", coords: [45.0180, 78.3800] }
     ];
+
+    // 3. Картаны Ақтау бойынша ашу
+    const map = L.map('map').setView(cities.aktau.coords, cities.aktau.zoom);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap'
+    }).addTo(map);
+
+    let currentMarkers = [];
+
+    // 4. Маркерлерді картаға шығару
+    function renderMarkers(selectedCity) {
+      currentMarkers.forEach(marker => map.removeLayer(marker));
+      currentMarkers = [];
+
+      ecoPoints.filter(p => p.city === selectedCity).forEach(point => {
+        const marker = L.marker(point.coords).addTo(map);
+        marker.bindPopup(`
+          <div style="font-size:14px; line-height: 1.4;">
+            <b style="color:#2e7d32; font-size:15px;">${point.title}</b><br>
+            <b>Қабылданады:</b> ${point.category}<br>
+            <b>Мекенжайы:</b> ${point.address}
+          </div>
+        `);
+        currentMarkers.push(marker);
+      });
+    }
+
+    // 5. Қала таңдалғанда картаны жылжыту
+    function changeCity() {
+      const selectedCity = document.getElementById('citySelect').value;
+      const cityData = cities[selectedCity];
+      
+      if (cityData) {
+        map.flyTo(cityData.coords, cityData.zoom);
+        renderMarkers(selectedCity);
+      }
+    }
+
+    // Алғашқы ашылғанда Ақтау нүктелерін шығару
+    renderMarkers('aktau');
+  </script>
+</body>
+</html>
